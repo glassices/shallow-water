@@ -1,5 +1,6 @@
 #include <string.h>
 #include <math.h>
+#include <omp.h>
 
 //ldoc on
 /**
@@ -52,6 +53,32 @@ void shallow2dv_speed(float* restrict cxy,
                       float g,
                       int ncell)
 {
+    static float max_cx[200];
+    static float max_cy[200];
+
+    int n;
+    #pragma omp parallel
+    {
+        n = omp_get_num_threads();
+        int id = omp_get_thread_num();
+        for (int i = ncell * id / n; i < ncell * (id + 1) / n; i++) {
+            float hi = h[i];
+            float inv_hi = 1.0f/h[i];
+            float root_gh = sqrtf(g * hi);
+            float cxi = fabsf(hu[i] * inv_hi) + root_gh;
+            float cyi = fabsf(hv[i] * inv_hi) + root_gh;
+            if (max_cx[id] < cxi) max_cx[id] = cxi;
+            if (max_cy[id] < cyi) max_cy[id] = cyi;
+        }
+    }
+    cxy[0] = max_cx[0];
+    cxy[1] = max_cy[0];
+    for (int i = 1; i < n; i++) {
+        if (cxy[0] < max_cx[i]) cxy[0] = max_cx[i];
+        if (cxy[1] < max_cy[i]) cxy[1] = max_cy[i];
+    }
+
+    /*
     float cx = cxy[0];
     float cy = cxy[1];
     for (int i = 0; i < ncell; ++i) {
@@ -65,6 +92,7 @@ void shallow2dv_speed(float* restrict cxy,
     }
     cxy[0] = cx;
     cxy[1] = cy;
+    */
 }
 
 
